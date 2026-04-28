@@ -10,10 +10,13 @@ import {
 } from "react-native";
 
 export default function Scoring() {
-  const { teamAPlayers, teamBPlayers } = useLocalSearchParams();
+  const { teamAPlayers, teamBPlayers, overs, battingTeam } =
+    useLocalSearchParams();
+  const totalOvers = Number(overs);
+  const maxBalls = totalOvers * 6;
 
-  const teamAList = JSON.parse(teamAPlayers as string);
-  const teamBList = JSON.parse(teamBPlayers as string);
+  const teamAList = JSON.parse((teamAPlayers as string) || "[]");
+  const teamBList = JSON.parse((teamBPlayers as string) || "[]");
 
   const createBatters = (list: string[]) =>
     list.map((p) => ({ name: p, runs: 0, balls: 0, out: false }));
@@ -21,26 +24,31 @@ export default function Scoring() {
   const createBowlers = (list: string[]) =>
     list.map((p) => ({ name: p, runs: 0, balls: 0, wickets: 0 }));
 
+  const isTeamABatting = battingTeam === "A";
   const [state, setState] = useState({
-    batting: createBatters(teamAList),
-    bowling: createBowlers(teamBList),
+    batting: createBatters(isTeamABatting ? teamAList : teamBList),
+    bowling: createBowlers(isTeamABatting ? teamBList : teamAList),
 
-    striker: null as number | null,
-    nonStriker: null as number | null,
-    nextBatsman: null as number | null,
+    striker: null,
+    nonStriker: null,
+    nextBatsman: null,
 
-    bowler: null as number | null,
+    bowler: null,
 
     score: 0,
     wickets: 0,
     balls: 0,
     extras: 0,
 
-    history: [] as any[],
-    overBalls: [] as any[],
+    history: [],
+    overBalls: [],
     freeHit: false,
-  });
 
+    // ✅ NEW
+    innings: 1,
+    target: null,
+    winner: null,
+  });
   const clone = (p: any) => ({
     ...p,
     batting: p.batting.map((x: any) => ({ ...x })),
@@ -87,6 +95,60 @@ export default function Scoring() {
     }
     return true;
   };
+  const checkMatchState = (m: any) => {
+    // ✅ FIRST INNINGS END
+    if (m.innings === 1 && (m.wickets === 10 || m.balls >= maxBalls)) {
+      Alert.alert("Innings Over");
+
+      return {
+        ...m,
+        innings: 2,
+        target: m.score + 1,
+
+        // reset stats
+        score: 0,
+        wickets: 0,
+        balls: 0,
+        extras: 0,
+        history: [],
+        overBalls: [],
+        freeHit: false,
+
+        // swap teams
+        batting: m.bowling.map((p) => ({
+          name: p.name,
+          runs: 0,
+          balls: 0,
+          out: false,
+        })),
+        bowling: m.batting.map((p) => ({
+          name: p.name,
+          runs: 0,
+          balls: 0,
+          wickets: 0,
+        })),
+
+        striker: null,
+        nonStriker: null,
+        nextBatsman: null,
+        bowler: null,
+      };
+    }
+
+    // ✅ SECOND INNINGS WIN CHECK
+    if (m.innings === 2 && m.target && m.score >= m.target) {
+      Alert.alert("Batting Team Won!");
+      return { ...m, winner: "Batting Team" };
+    }
+
+    // ✅ SECOND INNINGS LOSE
+    if (m.innings === 2 && (m.wickets === 10 || m.balls >= maxBalls)) {
+      Alert.alert("Bowling Team Won!");
+      return { ...m, winner: "Bowling Team" };
+    }
+
+    return m;
+  };
 
   const selectOpening = (i: number) => {
     if (state.striker === null) {
@@ -102,7 +164,9 @@ export default function Scoring() {
 
   const addRun = (r: number) => {
     setState((prev) => {
+      if (prev.winner) return prev; // ✅ ADD HERE
       let m = clone(prev);
+
       if (!ensureBowler(m)) return prev;
       if (m.striker === null || m.nonStriker === null) return prev;
       if (m.nextBatsman !== null) return prev;
@@ -125,12 +189,13 @@ export default function Scoring() {
 
       m.freeHit = false;
 
-      return { ...m };
+      return checkMatchState({ ...m });
     });
   };
 
   const wide = () => {
     setState((prev) => {
+      if (prev.winner) return prev; // 👈 ADD HERE
       let m = clone(prev);
       if (!ensureBowler(m)) return prev;
 
@@ -140,12 +205,14 @@ export default function Scoring() {
 
       pushBall(m, "WD", false);
 
-      return { ...m };
+      return checkMatchState({ ...m });
     });
   };
 
   const noBall = () => {
     setState((prev) => {
+      if (prev.winner) return prev; // 👈 ADD HERE
+
       let m = clone(prev);
       if (!ensureBowler(m)) return prev;
 
@@ -156,7 +223,7 @@ export default function Scoring() {
 
       pushBall(m, "NB", false);
 
-      return { ...m };
+      return checkMatchState({ ...m });
     });
   };
 
@@ -186,7 +253,7 @@ export default function Scoring() {
 
       m.nextBatsman = m.batting.findIndex((b: any) => !b.out);
 
-      return { ...m };
+      return checkMatchState({ ...m });
     });
   };
 
@@ -194,7 +261,7 @@ export default function Scoring() {
     setState((p) => ({ ...p, bowler: i }));
   };
 
-  const overs = getOver(state.balls);
+  const overString = getOver(state.balls);
 
   const currentOver =
     state.overBalls.length > 0
@@ -214,11 +281,17 @@ export default function Scoring() {
     <ScrollView style={styles.container}>
       <Text style={styles.header}>Batting</Text>
 
-      <Text style={styles.score}>
-        {state.score}/{state.wickets}
-      </Text>
+      <Text style={styles.text}>Innings: {state.innings}</Text>
 
-      <Text style={styles.text}>Overs: {overs}</Text>
+      {state.target && <Text style={styles.text}>Target: {state.target}</Text>}
+
+      {state.winner && (
+        <Text style={{ color: "yellow", fontSize: 18 }}>
+          Winner: {state.winner}
+        </Text>
+      )}
+
+      <Text style={styles.text}>Overs: {overString}</Text>
 
       {state.freeHit && <Text style={styles.free}>FREE HIT</Text>}
 
@@ -279,7 +352,8 @@ export default function Scoring() {
         )}
 
       {/* Controls */}
-      {state.nextBatsman === null &&
+      {!state.winner &&
+        state.nextBatsman === null &&
         state.striker !== null &&
         state.nonStriker !== null && (
           <>
