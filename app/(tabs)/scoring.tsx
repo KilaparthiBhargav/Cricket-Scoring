@@ -284,13 +284,19 @@ export default function Scoring() {
       <Text style={styles.text}>Innings: {state.innings}</Text>
 
       {state.target && <Text style={styles.text}>Target: {state.target}</Text>}
-
+      {state.innings === 2 && state.target && (
+        <Text style={styles.text}>
+          Need {Math.max(state.target - state.score, 0)} runs to win
+        </Text>
+      )}
       {state.winner && (
         <Text style={{ color: "yellow", fontSize: 18 }}>
           Winner: {state.winner}
         </Text>
       )}
-
+      <Text style={styles.score}>
+        Score: {state.score}/{state.wickets}
+      </Text> 
       <Text style={styles.text}>Overs: {overString}</Text>
 
       {state.freeHit && <Text style={styles.free}>FREE HIT</Text>}
