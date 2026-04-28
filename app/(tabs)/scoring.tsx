@@ -69,17 +69,23 @@ export default function Scoring() {
       if (b === "W") return sum;
       return sum + Number(b);
     }, 0);
-
   const pushBall = (m: any, symbol: any, legal: boolean) => {
     m.overBalls.push(symbol);
 
-    const valid = m.overBalls.filter(isLegal).length;
+    // ONLY THIS controls ball count
+    if (legal) {
+      m.balls++;
+    }
+
+    const valid = m.overBalls.filter(
+      (b: any) => b !== "WD" && b !== "NB",
+    ).length;
 
     if (valid === 6) {
       m.history.push({
         balls: [...m.overBalls],
         runs: getOverRuns(m.overBalls),
-        bowler: m.bowler, // ✅ FIX
+        bowler: m.bowler,
       });
 
       m.overBalls = [];
@@ -87,7 +93,6 @@ export default function Scoring() {
       m.bowler = null;
     }
   };
-
   const ensureBowler = (m: any) => {
     if (m.bowler === null) {
       Alert.alert("Select Bowler");
@@ -172,7 +177,7 @@ export default function Scoring() {
       if (m.nextBatsman !== null) return prev;
 
       m.score += r;
-      m.balls++;
+      // m.balls++; // OK (legal delivery)
 
       let striker = m.batting[m.striker];
       let bowler = m.bowling[m.bowler];
@@ -195,7 +200,8 @@ export default function Scoring() {
 
   const wide = () => {
     setState((prev) => {
-      if (prev.winner) return prev; // 👈 ADD HERE
+      if (prev.winner) return prev;
+
       let m = clone(prev);
       if (!ensureBowler(m)) return prev;
 
@@ -203,6 +209,7 @@ export default function Scoring() {
       m.extras++;
       m.bowling[m.bowler].runs++;
 
+      // ❌ no ball increment
       pushBall(m, "WD", false);
 
       return checkMatchState({ ...m });
@@ -211,7 +218,7 @@ export default function Scoring() {
 
   const noBall = () => {
     setState((prev) => {
-      if (prev.winner) return prev; // 👈 ADD HERE
+      if (prev.winner) return prev;
 
       let m = clone(prev);
       if (!ensureBowler(m)) return prev;
@@ -219,8 +226,10 @@ export default function Scoring() {
       m.score++;
       m.extras++;
       m.freeHit = true;
+
       m.bowling[m.bowler].runs++;
 
+      // ❌ IMPORTANT: do NOT count legal ball
       pushBall(m, "NB", false);
 
       return checkMatchState({ ...m });
@@ -239,7 +248,6 @@ export default function Scoring() {
 
       m.wickets++;
       m.balls++;
-
       let striker = m.batting[m.striker];
       let bowler = m.bowling[m.bowler];
 
@@ -286,7 +294,8 @@ export default function Scoring() {
       {state.target && <Text style={styles.text}>Target: {state.target}</Text>}
       {state.innings === 2 && state.target && (
         <Text style={styles.text}>
-          Need {Math.max(state.target - state.score, 0)} runs to win
+          Need {Math.max(state.target - state.score, 0)} runs in{" "}
+          {Math.max(maxBalls - state.balls, 0)} balls
         </Text>
       )}
       {state.winner && (
@@ -296,7 +305,7 @@ export default function Scoring() {
       )}
       <Text style={styles.score}>
         Score: {state.score}/{state.wickets}
-      </Text> 
+      </Text>
       <Text style={styles.text}>Overs: {overString}</Text>
 
       {state.freeHit && <Text style={styles.free}>FREE HIT</Text>}
@@ -420,19 +429,93 @@ export default function Scoring() {
     </ScrollView>
   );
 }
-
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#0f172a" },
-  header: { color: "#fff", fontSize: 20 },
-  score: { color: "#fff", fontSize: 30 },
-  text: { color: "#fff", marginVertical: 3 },
-  section: { color: "#22c55e", marginTop: 15 },
-  free: { color: "yellow" },
+  container: {
+    flex: 1,
+    backgroundColor: "#0b1220",
+    padding: 16,
+  },
 
-  row: { flexDirection: "row", flexWrap: "wrap" },
-  btn: { backgroundColor: "#2563eb", padding: 12, margin: 5 },
-  extra: { backgroundColor: "#facc15", padding: 10, margin: 5 },
-  wicket: { backgroundColor: "red", padding: 10, margin: 5 },
+  header: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 10,
+    letterSpacing: 1,
+  },
 
-  bowler: { backgroundColor: "#ddd", padding: 10, margin: 5 },
+  score: {
+    color: "#ffffff",
+    fontSize: 34,
+    fontWeight: "800",
+    marginVertical: 6,
+  },
+
+  text: {
+    color: "#cbd5e1",
+    fontSize: 14,
+    marginVertical: 2,
+  },
+
+  section: {
+    color: "#22c55e",
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 18,
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+
+  free: {
+    color: "#facc15",
+    fontWeight: "700",
+    marginTop: 4,
+  },
+
+  // rows (buttons)
+  row: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 10,
+    gap: 8,
+  },
+
+  btn: {
+    backgroundColor: "#1d4ed8",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    minWidth: 44,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  extra: {
+    backgroundColor: "#facc15",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  wicket: {
+    backgroundColor: "#ef4444",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  // player cards
+  bowler: {
+    backgroundColor: "#1e293b",
+    padding: 12,
+    marginVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
 });
