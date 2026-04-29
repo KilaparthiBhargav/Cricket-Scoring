@@ -12,6 +12,9 @@ import {
 export default function Scoring() {
   const { teamAPlayers, teamBPlayers, overs, battingTeam } =
     useLocalSearchParams();
+  const [tempStriker, setTempStriker] = useState(null);
+  const [tempNonStriker, setTempNonStriker] = useState(null);
+  const [tempBowler, setTempBowler] = useState(null);
   const totalOvers = Number(overs);
   const maxBalls = totalOvers * 6;
 
@@ -312,23 +315,75 @@ export default function Scoring() {
 
       {/* Opening Selection */}
       {(state.striker === null || state.nonStriker === null) && (
-        <View>
+        <View style={styles.card}>
           <Text style={styles.section}>Select Opening Batsmen</Text>
           {state.batting.map((b, i) => (
             <Pressable
               key={i}
-              style={styles.bowler}
-              onPress={() => selectOpening(i)}
+              style={[
+                styles.bowler,
+                (i === tempStriker || i === tempNonStriker) && {
+                  borderColor: "#22c55e",
+                  backgroundColor: "#14532d",
+                  color: "#fff",
+                },
+              ]}
+              onPress={() => {
+                if (tempStriker === i) {
+                  setTempStriker(null);
+                } else if (tempNonStriker === i) {
+                  setTempNonStriker(null);
+                } else if (tempStriker === null) {
+                  setTempStriker(i);
+                } else if (tempNonStriker === null) {
+                  setTempNonStriker(i);
+                }
+              }}
             >
-              <Text>{b.name}</Text>
+              <Text
+                style={[
+                  { color: "#0f172a" },
+                  (i === tempStriker || i === tempNonStriker) &&
+                    styles.selectedText,
+                ]}
+              >
+                {b.name}
+              </Text>
             </Pressable>
           ))}
+          <Text style={styles.text}>
+            Striker:{" "}
+            {tempStriker !== null ? state.batting[tempStriker].name : "-"}
+          </Text>
+          <Text style={styles.text}>
+            Non-Striker:{" "}
+            {tempNonStriker !== null ? state.batting[tempNonStriker].name : "-"}
+          </Text>
+
+          <Pressable
+            style={styles.btn}
+            onPress={() => {
+              if (tempStriker !== null && tempNonStriker !== null) {
+                setState((p) => ({
+                  ...p,
+                  striker: tempStriker,
+                  nonStriker: tempNonStriker,
+                }));
+                setTempStriker(null);
+                setTempNonStriker(null);
+              } else {
+                Alert.alert("Select both batsmen");
+              }
+            }}
+          >
+            <Text style={{ color: "#fff" }}>Confirm Batsmen</Text>
+          </Pressable>
         </View>
       )}
 
       {/* New Batsman */}
       {state.nextBatsman !== null && (
-        <View>
+        <View style={styles.card}>
           <Text style={styles.section}>Select New Batsman</Text>
           {state.batting.map(
             (b, i) =>
@@ -337,10 +392,24 @@ export default function Scoring() {
               i !== state.nonStriker && (
                 <Pressable
                   key={i}
-                  style={styles.bowler}
-                  onPress={() => selectBatsman(i)}
+                  style={[
+                    styles.bowler,
+                    (i === tempStriker || i === tempNonStriker) && {
+                      borderColor: "#22c55e",
+                      backgroundColor: "#14532d",
+                    },
+                  ]}
+                  onPress={() => setTempStriker(i)}
                 >
-                  <Text>{b.name}</Text>
+                  <Text
+                    style={[
+                      { color: "#0f172a" },
+                      (i === tempStriker || i === tempNonStriker) &&
+                        styles.selectedText,
+                    ]}
+                  >
+                    {b.name}
+                  </Text>
                 </Pressable>
               ),
           )}
@@ -352,17 +421,48 @@ export default function Scoring() {
         state.nextBatsman === null &&
         state.striker !== null &&
         state.nonStriker !== null && (
-          <View>
+          <View style={styles.card}>
             <Text style={styles.section}>Select Bowler</Text>
             {state.bowling.map((b, i) => (
               <Pressable
                 key={i}
-                style={styles.bowler}
-                onPress={() => selectBowler(i)}
+                style={[
+                  styles.bowler,
+                  i === tempBowler && {
+                    borderColor: "#facc15",
+                    backgroundColor: "#78350f",
+                  },
+                ]}
+                onPress={() => setTempBowler(i)}
               >
-                <Text>{b.name}</Text>
+                <Text
+                  style={[
+                    { color: "#0f172a" },
+                    i === tempBowler && styles.selectedText,
+                  ]}
+                >
+                  {b.name}
+                </Text>
               </Pressable>
             ))}
+            <Text style={styles.text}>
+              Selected Bowler:{" "}
+              {tempBowler !== null ? state.bowling[tempBowler].name : "-"}
+            </Text>
+
+            <Pressable
+              style={styles.btn}
+              onPress={() => {
+                if (tempBowler !== null) {
+                  setState((p) => ({ ...p, bowler: tempBowler }));
+                  setTempBowler(null);
+                } else {
+                  Alert.alert("Select bowler");
+                }
+              }}
+            >
+              <Text style={{ color: "#fff" }}>Confirm Bowler</Text>
+            </Pressable>
           </View>
         )}
 
@@ -398,7 +498,15 @@ export default function Scoring() {
       <Text style={styles.section}>
         This Over: {currentOver.map((b: any) => b.toString()).join(" ")}
       </Text>
+      <Text style={styles.text}>
+        Current Bowler:{" "}
+        {state.bowler !== null ? state.bowling[state.bowler].name : "-"}
+      </Text>
 
+      <Text style={styles.text}>
+        Striker:{" "}
+        {state.striker !== null ? state.batting[state.striker].name : "-"}
+      </Text>
       {/* History */}
       <Text style={styles.section}>Overs History</Text>
       {state.history.map((o, i) => (
@@ -432,90 +540,105 @@ export default function Scoring() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0b1220",
+    backgroundColor: "#f8fafc", // light background
     padding: 16,
   },
 
   header: {
-    color: "#ffffff",
+    color: "#0f172a",
     fontSize: 22,
     fontWeight: "700",
-    marginBottom: 10,
-    letterSpacing: 1,
+    marginBottom: 12,
   },
 
   score: {
-    color: "#ffffff",
-    fontSize: 34,
+    color: "#0f172a",
+    fontSize: 32,
     fontWeight: "800",
     marginVertical: 6,
   },
 
   text: {
-    color: "#cbd5e1",
+    color: "#475569",
     fontSize: 14,
     marginVertical: 2,
   },
 
   section: {
-    color: "#22c55e",
-    fontSize: 14,
+    color: "#2563eb",
+    fontSize: 15,
     fontWeight: "700",
-    marginTop: 18,
-    marginBottom: 8,
-    letterSpacing: 0.5,
+    marginTop: 20,
+    marginBottom: 10,
   },
 
   free: {
-    color: "#facc15",
+    color: "#eab308",
     fontWeight: "700",
-    marginTop: 4,
+    marginTop: 6,
   },
 
-  // rows (buttons)
   row: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 10,
-    gap: 8,
+    marginTop: 12,
+    gap: 10,
   },
 
   btn: {
-    backgroundColor: "#1d4ed8",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    minWidth: 44,
+    backgroundColor: "#2563eb",
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    minWidth: 50,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    color: "#ffffff",
   },
 
   extra: {
-    backgroundColor: "#facc15",
+    backgroundColor: "#f1f5f9",
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     borderRadius: 10,
-    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#cbd5f5",
   },
 
   wicket: {
     backgroundColor: "#ef4444",
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     borderRadius: 10,
-    alignItems: "center",
   },
 
-  // player cards
+  // Player card
   bowler: {
-    backgroundColor: "#1e293b",
-    padding: 12,
+    backgroundColor: "#ffffff",
+    padding: 14,
     marginVertical: 6,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#e2e8f0",
+  },
+
+  // Selected state
+  selected: {
+    borderColor: "#2563eb",
+    backgroundColor: "#dbeafe",
+  },
+
+  card: {
+    backgroundColor: "#ffffff",
+    padding: 14,
+    borderRadius: 6,
+    marginVertical: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  selectedText: {
+    color: "#ffffff",
+    fontWeight: "600",
   },
 });
